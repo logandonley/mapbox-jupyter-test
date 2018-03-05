@@ -128,7 +128,7 @@ function generatePropertyExpression(expressionType, propertyValue, stops, defaul
 
 </script>
 
-<!-- main map creation code, extended by mapboxgl/templates/clustered_circle.html -->
+<!-- main map creation code, extended by mapboxgl/templates/heatmap.html -->
 <script type="text/javascript">
 
 mapboxgl.accessToken = 'pk.eyJ1IjoibGRvbmxleSIsImEiOiJjamVlZjVib2ExNXNyMnJvOTZkbzMwbXFqIn0.GqHBCHk8kkPQyFqBQrL3cg';
@@ -153,132 +153,32 @@ var map = new mapboxgl.Map({
 });
 
 map.addControl(new mapboxgl.NavigationControl());
-    
-calcCircleColorLegend([[1, 'rgb(166,97,26)'], [10, 'rgb(223,194,125)'], [50, 'rgb(128,205,193)'], [100, 'rgb(1,133,113)']], "Point Density");
+
+document.getElementById('legend').style.visibility = 'hidden';
 
 map.on('style.load', function() {
-    
+
     map.addSource("data", {
         "type": "geojson",
         "data": "points1.geojson", //data from dataframe output to geojson
         "buffer": 0,
-        "maxzoom": 10 + 1,
-        "cluster": true,
-        "clusterMaxZoom": 10,
-        "clusterRadius": 30
+        "maxzoom": 14
     });
 
     map.addLayer({
-        "id": "label",
+        "id": "circle",
         "source": "data",
-        "type": "symbol",
+        "type": "heatmap",
         "maxzoom": 24,
         "minzoom": 0,
-        "layout": {
-            "text-field": "{point_count_abbreviated}",
-            "text-size" : generateInterpolateExpression('zoom', [[0,8],[22,16]] )
-        },
         "paint": {
-            "text-halo-color": "white",
-            "text-halo-width": 1
+            "heatmap-weight": generateInterpolateExpression( "Avg Medicare Payments", [[4991.6, 0.0], [5715.49, 0.12], [6290.26, 0.25], [6892.24, 0.38], [7419.25, 0.5], [8017.06, 0.62], [8676.76, 0.75], [9758.11, 0.88]] ),
+            "heatmap-radius" : generateInterpolateExpression('zoom', [[0, 1], [15, 40]] ),
+            "heatmap-color" : generateInterpolateExpression('heatmap-density', [[0.01, 'rgb(254,235,226)'], [0.25, 'rgb(251,180,185)'], [0.5, 'rgb(247,104,161)'], [0.75, 'rgb(197,27,138)'], [1, 'rgb(122,1,119)']] ),
+            "heatmap-opacity" : 0.9
         }
-    }, "" )
+    }, "waterway-label" );
 
-    map.addLayer({
-        "id": "circle-cluster",
-        "source": "data",
-        "type": "circle",
-        "maxzoom": 24,
-        "minzoom": 0,
-        "filter": ["has", "point_count"],
-        "paint": {
-            "circle-color": generateInterpolateExpression( "point_count", [[1, 'rgb(166,97,26)'], [10, 'rgb(223,194,125)'], [50, 'rgb(128,205,193)'], [100, 'rgb(1,133,113)']] ),
-            "circle-radius" : generateInterpolateExpression( "point_count", [[1, 5], [10, 10], [50, 15], [100, 20]] ),
-            "circle-stroke-color": "grey",
-            "circle-stroke-width": generateInterpolateExpression('zoom', [[0,0.01], [18,1]]),
-            "circle-opacity" : 0.9
-        }
-    }, "label");
-
-    map.addLayer({
-        "id": "circle-unclustered",
-        "source": "data",
-        "type": "circle",
-        "maxzoom": 24,
-        "minzoom": 0,
-        "filter": ["!has", "point_count"],
-        "paint": {
-            "circle-color": "rgb(166,97,26)",
-            "circle-radius" : generateInterpolateExpression( 'zoom', [[0,1], [22,10]]),
-            "circle-stroke-color": "grey",
-            "circle-stroke-width": generateInterpolateExpression('zoom', [[0,0.01], [18,1]]),
-            "circle-opacity" : 0.9
-        }
-    }, "circle-cluster");
-    
-    // Create a popup
-    var popup = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false
-    });
-    
-    // Show the popup on mouseover
-    map.on('mousemove', 'circle-unclustered', function(e) {
-        map.getCanvas().style.cursor = 'pointer';
-        let f = e.features[0];
-        let popup_html = '<div><li><b>Location</b>: ' + f.geometry.coordinates[0].toPrecision(6) + 
-            ', ' + f.geometry.coordinates[1].toPrecision(6) + '</li>';
-
-        for (key in f.properties) {
-            popup_html += '<li><b> ' + key + '</b>: ' + f.properties[key] + ' </li>'
-        }
-
-        popup_html += '</div>'
-
-        popup.setLngLat(e.features[0].geometry.coordinates)
-            .setHTML(popup_html)
-            .addTo(map);
-    });
-
-    map.on('mousemove', 'circle-cluster', function(e) {
-        map.getCanvas().style.cursor = 'pointer';
-        let f = e.features[0];
-        let popup_html = '<div><li><b>Location</b>: ' + f.geometry.coordinates[0].toPrecision(6) + 
-            ', ' + f.geometry.coordinates[1].toPrecision(6) + '</li>';
-
-        popup_html += '<li><b>Point Count:</b>: ' + f.properties.point_count + ' </li>'
-
-        popup_html += '</div>'
-
-        popup.setLngLat(e.features[0].geometry.coordinates)
-            .setHTML(popup_html)
-            .addTo(map);
-    });
-
-    map.on('mouseleave', 'circle-unclustered', function() {
-        map.getCanvas().style.cursor = '';
-        popup.remove();
-    });
-
-    map.on('mouseleave', 'circle-cluster', function() {
-        map.getCanvas().style.cursor = '';
-        popup.remove();
-    });
-    
-
-    map.on('click', 'circle-unclustered', function(e) {
-        map.easeTo({
-            center: e.features[0].geometry.coordinates,
-            zoom: map.getZoom() + 1
-        });
-    });
-
-    map.on('click', 'circle-cluster', function(e) {
-        map.easeTo({
-            center: e.features[0].geometry.coordinates,
-            zoom: map.getZoom() + 1
-        });
-    });
 });
 
 
